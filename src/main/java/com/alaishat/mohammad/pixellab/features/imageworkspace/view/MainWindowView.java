@@ -4,6 +4,7 @@ import com.alaishat.mohammad.pixellab.features.channels.viewmodel.ChannelsViewMo
 import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.viewmodel.EditSessionViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
+import com.alaishat.mohammad.pixellab.features.quantization.viewmodel.QuantizationViewModel;
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
@@ -20,11 +21,12 @@ public final class MainWindowView extends BorderPane {
                           EditSessionViewModel editViewModel,
                           ColorSpaceViewModel colorSpaceViewModel,
                           ChannelsViewModel channelsViewModel,
+                          QuantizationViewModel quantizationViewModel,
                           RecentFilesViewModel recentFilesViewModel) {
         setTop(new ToolbarView(workspaceViewModel, editViewModel));
         setLeft(new LeftPaneView(colorSpaceViewModel, recentFilesViewModel, workspaceViewModel::open));
         setCenter(new ImageCanvasView(workspaceViewModel));
-        setRight(new RightPaneView(workspaceViewModel, channelsViewModel));
+        setRight(new RightPaneView(workspaceViewModel, channelsViewModel, quantizationViewModel));
         setBottom(buildErrorBar(workspaceViewModel, editViewModel));
     }
 

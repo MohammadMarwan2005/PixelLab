@@ -14,6 +14,8 @@ import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveImageUseC
 import com.alaishat.mohammad.pixellab.features.editsession.viewmodel.EditSessionViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.usecase.LoadImageUseCase;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
+import com.alaishat.mohammad.pixellab.features.quantization.usecase.QuantizeColorsUseCase;
+import com.alaishat.mohammad.pixellab.features.quantization.viewmodel.QuantizationViewModel;
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.AddRecentFileUseCase;
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.LoadRecentFilesUseCase;
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.RemoveRecentFileUseCase;
@@ -32,6 +34,7 @@ public final class AppComponent {
     private final EditSessionViewModel editSessionViewModel;
     private final ColorSpaceViewModel colorSpaceViewModel;
     private final ChannelsViewModel channelsViewModel;
+    private final QuantizationViewModel quantizationViewModel;
     private final RecentFilesViewModel recentFilesViewModel;
 
     public AppComponent() {
@@ -43,17 +46,23 @@ public final class AppComponent {
                 imageWorkspaceViewModel,
                 new ConvertColorSpaceUseCase());
 
-        ApplyChannelAdjustmentsUseCase applyAdjustments = new ApplyChannelAdjustmentsUseCase();
+        // Pipeline: ChannelsViewModel emits channelAdjustedBuffer; QuantizationViewModel
+        // consumes it and writes the final working buffer.
         this.channelsViewModel = new ChannelsViewModel(
                 imageWorkspaceViewModel,
                 colorSpaceViewModel,
-                applyAdjustments,
+                new ApplyChannelAdjustmentsUseCase(),
                 new SplitChannelsUseCase());
+        this.quantizationViewModel = new QuantizationViewModel(
+                imageWorkspaceViewModel,
+                channelsViewModel,
+                new QuantizeColorsUseCase());
 
-        // EditSessionViewModel last because reset() needs to clear channel state too.
+        // EditSessionViewModel last — reset() needs to clear channel + quantization state.
         this.editSessionViewModel = new EditSessionViewModel(
                 imageWorkspaceViewModel,
                 channelsViewModel,
+                quantizationViewModel,
                 new ResetUseCase(),
                 new SaveImageUseCase(imageSaver),
                 new SaveAsImageUseCase(imageSaver));
@@ -79,5 +88,6 @@ public final class AppComponent {
     public EditSessionViewModel editSessionViewModel()       { return editSessionViewModel; }
     public ColorSpaceViewModel colorSpaceViewModel()         { return colorSpaceViewModel; }
     public ChannelsViewModel channelsViewModel()             { return channelsViewModel; }
+    public QuantizationViewModel quantizationViewModel()     { return quantizationViewModel; }
     public RecentFilesViewModel recentFilesViewModel()       { return recentFilesViewModel; }
 }
