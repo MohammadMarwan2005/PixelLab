@@ -3,7 +3,6 @@ package com.alaishat.mohammad.pixellab.features.imageworkspace.view;
 import com.alaishat.mohammad.pixellab.domain.image.ImageMetadata;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
 import javafx.beans.binding.Bindings;
-import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
@@ -16,10 +15,7 @@ import javafx.scene.layout.VBox;
 public final class MetadataPanelView extends VBox {
 
     public MetadataPanelView(ImageWorkspaceViewModel viewModel) {
-        setPadding(new Insets(12));
         setSpacing(8);
-        setPrefWidth(240);
-        setMinWidth(180);
 
         Label heading = new Label("Image");
         heading.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");

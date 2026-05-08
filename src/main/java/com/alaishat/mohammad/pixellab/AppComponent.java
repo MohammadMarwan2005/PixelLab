@@ -3,6 +3,9 @@ package com.alaishat.mohammad.pixellab;
 import com.alaishat.mohammad.pixellab.domain.image.ImageLoader;
 import com.alaishat.mohammad.pixellab.domain.image.ImageSaver;
 import com.alaishat.mohammad.pixellab.domain.recentfiles.RecentFilesStore;
+import com.alaishat.mohammad.pixellab.features.channels.usecase.ApplyChannelAdjustmentsUseCase;
+import com.alaishat.mohammad.pixellab.features.channels.usecase.SplitChannelsUseCase;
+import com.alaishat.mohammad.pixellab.features.channels.viewmodel.ChannelsViewModel;
 import com.alaishat.mohammad.pixellab.features.colorspace.usecase.ConvertColorSpaceUseCase;
 import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.ResetUseCase;
@@ -28,6 +31,7 @@ public final class AppComponent {
     private final ImageWorkspaceViewModel imageWorkspaceViewModel;
     private final EditSessionViewModel editSessionViewModel;
     private final ColorSpaceViewModel colorSpaceViewModel;
+    private final ChannelsViewModel channelsViewModel;
     private final RecentFilesViewModel recentFilesViewModel;
 
     public AppComponent() {
@@ -35,14 +39,24 @@ public final class AppComponent {
         ImageSaver imageSaver = new FileSystemImageSaver();
 
         this.imageWorkspaceViewModel = new ImageWorkspaceViewModel(new LoadImageUseCase(imageLoader));
-        this.editSessionViewModel = new EditSessionViewModel(
-                imageWorkspaceViewModel,
-                new ResetUseCase(),
-                new SaveImageUseCase(imageSaver),
-                new SaveAsImageUseCase(imageSaver));
         this.colorSpaceViewModel = new ColorSpaceViewModel(
                 imageWorkspaceViewModel,
                 new ConvertColorSpaceUseCase());
+
+        ApplyChannelAdjustmentsUseCase applyAdjustments = new ApplyChannelAdjustmentsUseCase();
+        this.channelsViewModel = new ChannelsViewModel(
+                imageWorkspaceViewModel,
+                colorSpaceViewModel,
+                applyAdjustments,
+                new SplitChannelsUseCase());
+
+        // EditSessionViewModel last because reset() needs to clear channel state too.
+        this.editSessionViewModel = new EditSessionViewModel(
+                imageWorkspaceViewModel,
+                channelsViewModel,
+                new ResetUseCase(),
+                new SaveImageUseCase(imageSaver),
+                new SaveAsImageUseCase(imageSaver));
 
         RecentFilesStore recentFilesStore = new JsonRecentFilesStore();
         this.recentFilesViewModel = new RecentFilesViewModel(
@@ -61,19 +75,9 @@ public final class AppComponent {
         recentFilesViewModel.refresh();
     }
 
-    public ImageWorkspaceViewModel imageWorkspaceViewModel() {
-        return imageWorkspaceViewModel;
-    }
-
-    public EditSessionViewModel editSessionViewModel() {
-        return editSessionViewModel;
-    }
-
-    public ColorSpaceViewModel colorSpaceViewModel() {
-        return colorSpaceViewModel;
-    }
-
-    public RecentFilesViewModel recentFilesViewModel() {
-        return recentFilesViewModel;
-    }
+    public ImageWorkspaceViewModel imageWorkspaceViewModel() { return imageWorkspaceViewModel; }
+    public EditSessionViewModel editSessionViewModel()       { return editSessionViewModel; }
+    public ColorSpaceViewModel colorSpaceViewModel()         { return colorSpaceViewModel; }
+    public ChannelsViewModel channelsViewModel()             { return channelsViewModel; }
+    public RecentFilesViewModel recentFilesViewModel()       { return recentFilesViewModel; }
 }

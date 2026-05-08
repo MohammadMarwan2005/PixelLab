@@ -1,6 +1,7 @@
 package com.alaishat.mohammad.pixellab.features.editsession.viewmodel;
 
 import com.alaishat.mohammad.pixellab.domain.image.EditSession;
+import com.alaishat.mohammad.pixellab.features.channels.viewmodel.ChannelsViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.ResetUseCase;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveAsImageUseCase;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveImageUseCase;
@@ -16,6 +17,7 @@ import java.util.Objects;
 public final class EditSessionViewModel {
 
     private final ImageWorkspaceViewModel workspace;
+    private final ChannelsViewModel channelsViewModel;
     private final ResetUseCase resetUseCase;
     private final SaveImageUseCase saveUseCase;
     private final SaveAsImageUseCase saveAsUseCase;
@@ -23,10 +25,12 @@ public final class EditSessionViewModel {
     private final ReadOnlyObjectWrapper<Throwable> lastError = new ReadOnlyObjectWrapper<>();
 
     public EditSessionViewModel(ImageWorkspaceViewModel workspace,
+                                ChannelsViewModel channelsViewModel,
                                 ResetUseCase resetUseCase,
                                 SaveImageUseCase saveUseCase,
                                 SaveAsImageUseCase saveAsUseCase) {
         this.workspace = Objects.requireNonNull(workspace, "workspace");
+        this.channelsViewModel = Objects.requireNonNull(channelsViewModel, "channelsViewModel");
         this.resetUseCase = Objects.requireNonNull(resetUseCase, "resetUseCase");
         this.saveUseCase = Objects.requireNonNull(saveUseCase, "saveUseCase");
         this.saveAsUseCase = Objects.requireNonNull(saveAsUseCase, "saveAsUseCase");
@@ -45,7 +49,10 @@ public final class EditSessionViewModel {
         if (session == null) return;
         try {
             resetUseCase.execute(session);
-            workspace.republishWorkingBuffer();
+            // Resetting channel sliders triggers the channels VM to recompute the working
+            // buffer from the original — without this step, lingering slider values would
+            // immediately overwrite the buffer the reset use case just restored.
+            channelsViewModel.resetAll();
             lastError.set(null);
         } catch (RuntimeException e) {
             lastError.set(e);

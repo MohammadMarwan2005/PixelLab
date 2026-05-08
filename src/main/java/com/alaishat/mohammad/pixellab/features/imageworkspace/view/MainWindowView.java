@@ -1,5 +1,6 @@
 package com.alaishat.mohammad.pixellab.features.imageworkspace.view;
 
+import com.alaishat.mohammad.pixellab.features.channels.viewmodel.ChannelsViewModel;
 import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.viewmodel.EditSessionViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
@@ -18,11 +19,12 @@ public final class MainWindowView extends BorderPane {
     public MainWindowView(ImageWorkspaceViewModel workspaceViewModel,
                           EditSessionViewModel editViewModel,
                           ColorSpaceViewModel colorSpaceViewModel,
+                          ChannelsViewModel channelsViewModel,
                           RecentFilesViewModel recentFilesViewModel) {
         setTop(new ToolbarView(workspaceViewModel, editViewModel));
         setLeft(new LeftPaneView(colorSpaceViewModel, recentFilesViewModel, workspaceViewModel::open));
         setCenter(new ImageCanvasView(workspaceViewModel));
-        setRight(new MetadataPanelView(workspaceViewModel));
+        setRight(new RightPaneView(workspaceViewModel, channelsViewModel));
         setBottom(buildErrorBar(workspaceViewModel, editViewModel));
     }
 
