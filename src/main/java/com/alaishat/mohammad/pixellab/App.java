@@ -23,6 +23,7 @@ public class App extends Application {
         MainWindowView root = new MainWindowView(
                 component.imageWorkspaceViewModel(),
                 component.editSessionViewModel(),
+                component.colorSpaceViewModel(),
                 component.recentFilesViewModel());
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 

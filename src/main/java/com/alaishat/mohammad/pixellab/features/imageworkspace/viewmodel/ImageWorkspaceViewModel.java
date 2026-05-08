@@ -8,6 +8,8 @@ import com.alaishat.mohammad.pixellab.features.imageworkspace.usecase.LoadImageU
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyIntegerProperty;
+import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleObjectProperty;
@@ -20,11 +22,25 @@ public final class ImageWorkspaceViewModel {
 
     private final LoadImageUseCase loadImage;
 
+    /** Source of truth for the loaded image and its working copy. */
     private final ObjectProperty<EditSession> editSession = new SimpleObjectProperty<>();
+    /**
+     * What the canvas renders. Updated by {@link
+     * com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel}
+     * — RGB equals the working buffer; non-RGB is a display-encoded conversion.
+     */
     private final ObjectProperty<PixelBuffer> currentBuffer = new SimpleObjectProperty<>();
     private final ObjectProperty<ImageMetadata> currentMetadata = new SimpleObjectProperty<>();
     private final ObjectProperty<Path> currentSource = new SimpleObjectProperty<>();
     private final ReadOnlyObjectWrapper<Throwable> lastError = new ReadOnlyObjectWrapper<>();
+
+    /**
+     * Tick counter bumped whenever the working buffer is mutated or replaced.
+     * Listeners (color space, channel manipulation, …) treat the bump as
+     * "re-render now" — JavaFX object properties don't fire when the reference
+     * stays the same, so we need an explicit signal for in-place mutations.
+     */
+    private final ReadOnlyIntegerWrapper workingBufferRevision = new ReadOnlyIntegerWrapper(0);
 
     public ImageWorkspaceViewModel(LoadImageUseCase loadImage) {
         this.loadImage = Objects.requireNonNull(loadImage, "loadImage");
@@ -50,6 +66,10 @@ public final class ImageWorkspaceViewModel {
         return lastError.getReadOnlyProperty();
     }
 
+    public ReadOnlyIntegerProperty workingBufferRevisionProperty() {
+        return workingBufferRevision.getReadOnlyProperty();
+    }
+
     public BooleanBinding hasImageBinding() {
         return Bindings.isNotNull(editSession);
     }
@@ -59,7 +79,7 @@ public final class ImageWorkspaceViewModel {
             ImageLoader.LoadedImage loaded = loadImage.execute(source);
             EditSession session = new EditSession(loaded.pixels(), source, loaded.metadata().format());
             editSession.set(session);
-            currentBuffer.set(session.workingBuffer());
+            // currentBuffer is published by ColorSpaceViewModel reacting to the editSession change.
             currentMetadata.set(loaded.metadata());
             // Set source last so listeners observing it (e.g. recents) see the
             // metadata + buffer already in place when they fire.
@@ -71,14 +91,11 @@ public final class ImageWorkspaceViewModel {
     }
 
     /**
-     * Re-publishes the current session's working buffer to {@link #currentBufferProperty()}.
-     * Edit use cases that replace the working buffer (Reset, Convert color space, …) call
-     * this so the canvas re-renders.
+     * Signals that the current session's working buffer has been replaced or
+     * mutated. Use cases like Reset call this so observers (color space, future
+     * channel/quantize features) recompute the displayed buffer.
      */
     public void republishWorkingBuffer() {
-        EditSession session = editSession.get();
-        if (session != null) {
-            currentBuffer.set(session.workingBuffer());
-        }
+        workingBufferRevision.set(workingBufferRevision.get() + 1);
     }
 }

@@ -1,25 +1,26 @@
 package com.alaishat.mohammad.pixellab.features.imageworkspace.view;
 
+import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.viewmodel.EditSessionViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
-import com.alaishat.mohammad.pixellab.features.recentfiles.view.RecentFilesPanelView;
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
 
 /**
- * 3-pane shell (Phase 2.4): toolbar on top, recent files on the left,
- * image canvas in the center, metadata panel on the right. Errors from either
- * load or save flows surface in a small status line at the bottom.
+ * 3-pane shell (Phase 2.4): toolbar on top, recent files + color space on the
+ * left, image canvas in the center, metadata panel on the right. Errors from
+ * either load or save flows surface in a small status line at the bottom.
  */
 public final class MainWindowView extends BorderPane {
 
     public MainWindowView(ImageWorkspaceViewModel workspaceViewModel,
                           EditSessionViewModel editViewModel,
+                          ColorSpaceViewModel colorSpaceViewModel,
                           RecentFilesViewModel recentFilesViewModel) {
         setTop(new ToolbarView(workspaceViewModel, editViewModel));
-        setLeft(new RecentFilesPanelView(recentFilesViewModel, workspaceViewModel::open));
+        setLeft(new LeftPaneView(colorSpaceViewModel, recentFilesViewModel, workspaceViewModel::open));
         setCenter(new ImageCanvasView(workspaceViewModel));
         setRight(new MetadataPanelView(workspaceViewModel));
         setBottom(buildErrorBar(workspaceViewModel, editViewModel));

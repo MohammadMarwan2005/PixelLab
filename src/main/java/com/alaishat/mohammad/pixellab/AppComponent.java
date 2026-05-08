@@ -3,6 +3,8 @@ package com.alaishat.mohammad.pixellab;
 import com.alaishat.mohammad.pixellab.domain.image.ImageLoader;
 import com.alaishat.mohammad.pixellab.domain.image.ImageSaver;
 import com.alaishat.mohammad.pixellab.domain.recentfiles.RecentFilesStore;
+import com.alaishat.mohammad.pixellab.features.colorspace.usecase.ConvertColorSpaceUseCase;
+import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.ResetUseCase;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveAsImageUseCase;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveImageUseCase;
@@ -25,6 +27,7 @@ public final class AppComponent {
 
     private final ImageWorkspaceViewModel imageWorkspaceViewModel;
     private final EditSessionViewModel editSessionViewModel;
+    private final ColorSpaceViewModel colorSpaceViewModel;
     private final RecentFilesViewModel recentFilesViewModel;
 
     public AppComponent() {
@@ -37,6 +40,9 @@ public final class AppComponent {
                 new ResetUseCase(),
                 new SaveImageUseCase(imageSaver),
                 new SaveAsImageUseCase(imageSaver));
+        this.colorSpaceViewModel = new ColorSpaceViewModel(
+                imageWorkspaceViewModel,
+                new ConvertColorSpaceUseCase());
 
         RecentFilesStore recentFilesStore = new JsonRecentFilesStore();
         this.recentFilesViewModel = new RecentFilesViewModel(
@@ -61,6 +67,10 @@ public final class AppComponent {
 
     public EditSessionViewModel editSessionViewModel() {
         return editSessionViewModel;
+    }
+
+    public ColorSpaceViewModel colorSpaceViewModel() {
+        return colorSpaceViewModel;
     }
 
     public RecentFilesViewModel recentFilesViewModel() {
