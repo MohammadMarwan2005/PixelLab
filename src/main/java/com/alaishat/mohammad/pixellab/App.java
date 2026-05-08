@@ -26,6 +26,8 @@ public class App extends Application {
                 component.colorSpaceViewModel(),
                 component.channelsViewModel(),
                 component.quantizationViewModel(),
+                component.visualizationViewModel(),
+                component.colorPickerViewModel(),
                 component.recentFilesViewModel());
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 

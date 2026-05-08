@@ -6,6 +6,8 @@ import com.alaishat.mohammad.pixellab.domain.recentfiles.RecentFilesStore;
 import com.alaishat.mohammad.pixellab.features.channels.usecase.ApplyChannelAdjustmentsUseCase;
 import com.alaishat.mohammad.pixellab.features.channels.usecase.SplitChannelsUseCase;
 import com.alaishat.mohammad.pixellab.features.channels.viewmodel.ChannelsViewModel;
+import com.alaishat.mohammad.pixellab.features.colorpicker.usecase.CopyToClipboardUseCase;
+import com.alaishat.mohammad.pixellab.features.colorpicker.viewmodel.ColorPickerViewModel;
 import com.alaishat.mohammad.pixellab.features.colorspace.usecase.ConvertColorSpaceUseCase;
 import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.editsession.usecase.ResetUseCase;
@@ -20,6 +22,8 @@ import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.AddRecentFile
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.LoadRecentFilesUseCase;
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.RemoveRecentFileUseCase;
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
+import com.alaishat.mohammad.pixellab.features.visualization3d.usecase.SampleColorSpaceUseCase;
+import com.alaishat.mohammad.pixellab.features.visualization3d.viewmodel.ColorSpaceVisualizationViewModel;
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageLoader;
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageSaver;
 import com.alaishat.mohammad.pixellab.infrastructure.persistence.JsonRecentFilesStore;
@@ -35,6 +39,8 @@ public final class AppComponent {
     private final ColorSpaceViewModel colorSpaceViewModel;
     private final ChannelsViewModel channelsViewModel;
     private final QuantizationViewModel quantizationViewModel;
+    private final ColorSpaceVisualizationViewModel visualizationViewModel;
+    private final ColorPickerViewModel colorPickerViewModel;
     private final RecentFilesViewModel recentFilesViewModel;
 
     public AppComponent() {
@@ -57,6 +63,12 @@ public final class AppComponent {
                 imageWorkspaceViewModel,
                 channelsViewModel,
                 new QuantizeColorsUseCase());
+
+        // 3D viz + sync color picker: rebuild samples on space change; picker reads picked sample.
+        this.visualizationViewModel = new ColorSpaceVisualizationViewModel(
+                colorSpaceViewModel,
+                new SampleColorSpaceUseCase());
+        this.colorPickerViewModel = new ColorPickerViewModel(visualizationViewModel, new CopyToClipboardUseCase());
 
         // EditSessionViewModel last — reset() needs to clear channel + quantization state.
         this.editSessionViewModel = new EditSessionViewModel(
@@ -84,10 +96,12 @@ public final class AppComponent {
         recentFilesViewModel.refresh();
     }
 
-    public ImageWorkspaceViewModel imageWorkspaceViewModel() { return imageWorkspaceViewModel; }
-    public EditSessionViewModel editSessionViewModel()       { return editSessionViewModel; }
-    public ColorSpaceViewModel colorSpaceViewModel()         { return colorSpaceViewModel; }
-    public ChannelsViewModel channelsViewModel()             { return channelsViewModel; }
-    public QuantizationViewModel quantizationViewModel()     { return quantizationViewModel; }
-    public RecentFilesViewModel recentFilesViewModel()       { return recentFilesViewModel; }
+    public ImageWorkspaceViewModel imageWorkspaceViewModel()           { return imageWorkspaceViewModel; }
+    public EditSessionViewModel editSessionViewModel()                 { return editSessionViewModel; }
+    public ColorSpaceViewModel colorSpaceViewModel()                   { return colorSpaceViewModel; }
+    public ChannelsViewModel channelsViewModel()                       { return channelsViewModel; }
+    public QuantizationViewModel quantizationViewModel()               { return quantizationViewModel; }
+    public ColorSpaceVisualizationViewModel visualizationViewModel()   { return visualizationViewModel; }
+    public ColorPickerViewModel colorPickerViewModel()                 { return colorPickerViewModel; }
+    public RecentFilesViewModel recentFilesViewModel()                 { return recentFilesViewModel; }
 }
