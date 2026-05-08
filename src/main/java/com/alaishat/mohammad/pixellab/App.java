@@ -22,6 +22,7 @@ public class App extends Application {
     public void start(Stage stage) {
         MainWindowView root = new MainWindowView(
                 component.imageWorkspaceViewModel(),
+                component.editSessionViewModel(),
                 component.recentFilesViewModel());
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 

@@ -1,7 +1,12 @@
 package com.alaishat.mohammad.pixellab;
 
 import com.alaishat.mohammad.pixellab.domain.image.ImageLoader;
+import com.alaishat.mohammad.pixellab.domain.image.ImageSaver;
 import com.alaishat.mohammad.pixellab.domain.recentfiles.RecentFilesStore;
+import com.alaishat.mohammad.pixellab.features.editsession.usecase.ResetUseCase;
+import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveAsImageUseCase;
+import com.alaishat.mohammad.pixellab.features.editsession.usecase.SaveImageUseCase;
+import com.alaishat.mohammad.pixellab.features.editsession.viewmodel.EditSessionViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.usecase.LoadImageUseCase;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.AddRecentFileUseCase;
@@ -9,6 +14,7 @@ import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.LoadRecentFil
 import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.RemoveRecentFileUseCase;
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageLoader;
+import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageSaver;
 import com.alaishat.mohammad.pixellab.infrastructure.persistence.JsonRecentFilesStore;
 
 /**
@@ -18,12 +24,19 @@ import com.alaishat.mohammad.pixellab.infrastructure.persistence.JsonRecentFiles
 public final class AppComponent {
 
     private final ImageWorkspaceViewModel imageWorkspaceViewModel;
+    private final EditSessionViewModel editSessionViewModel;
     private final RecentFilesViewModel recentFilesViewModel;
 
     public AppComponent() {
         ImageLoader imageLoader = new FileSystemImageLoader();
-        LoadImageUseCase loadImageUseCase = new LoadImageUseCase(imageLoader);
-        this.imageWorkspaceViewModel = new ImageWorkspaceViewModel(loadImageUseCase);
+        ImageSaver imageSaver = new FileSystemImageSaver();
+
+        this.imageWorkspaceViewModel = new ImageWorkspaceViewModel(new LoadImageUseCase(imageLoader));
+        this.editSessionViewModel = new EditSessionViewModel(
+                imageWorkspaceViewModel,
+                new ResetUseCase(),
+                new SaveImageUseCase(imageSaver),
+                new SaveAsImageUseCase(imageSaver));
 
         RecentFilesStore recentFilesStore = new JsonRecentFilesStore();
         this.recentFilesViewModel = new RecentFilesViewModel(
@@ -44,6 +57,10 @@ public final class AppComponent {
 
     public ImageWorkspaceViewModel imageWorkspaceViewModel() {
         return imageWorkspaceViewModel;
+    }
+
+    public EditSessionViewModel editSessionViewModel() {
+        return editSessionViewModel;
     }
 
     public RecentFilesViewModel recentFilesViewModel() {
