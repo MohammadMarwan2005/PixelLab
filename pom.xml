@@ -19,6 +19,12 @@
         <junit.version>5.11.4</junit.version>
 
         <main.class>com.alaishat.mohammad.pixellab.App</main.class>
+        <!--
+          Launcher class for the fat JAR. The JVM rejects an Application-extending
+          main class when JavaFX is on the classpath, so we delegate from a plain
+          class — same trick we use for IntelliJ runs.
+        -->
+        <launcher.class>com.alaishat.mohammad.pixellab.Launcher</launcher.class>
     </properties>
 
     <dependencies>
@@ -82,6 +88,44 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
+            </plugin>
+
+            <!-- Phase 10.5: fat jar runnable as `java -jar target/PixelLab-1.0-SNAPSHOT-fat.jar`.
+                 Bundles JavaFX + Jackson; works on the build platform only (JavaFX natives). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.3</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>fat</shadedClassifierName>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${launcher.class}</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

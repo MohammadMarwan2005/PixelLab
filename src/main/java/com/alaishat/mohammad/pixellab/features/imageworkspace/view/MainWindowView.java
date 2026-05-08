@@ -9,15 +9,14 @@ import com.alaishat.mohammad.pixellab.features.quantization.viewmodel.Quantizati
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
 import com.alaishat.mohammad.pixellab.features.visualization3d.viewmodel.ColorSpaceVisualizationViewModel;
 import com.alaishat.mohammad.pixellab.shared.threading.UpdateCoalescer;
-import javafx.geometry.Insets;
-import javafx.scene.control.Label;
+import javafx.scene.control.Alert;
 import javafx.scene.layout.BorderPane;
 
 /**
  * 3-pane shell (Phase 2.4): toolbar on top, recent files + color space on the
  * left, image canvas / 3D viz tabs in the center, metadata + processing
- * controls on the right. Errors from load and edit flows surface in a small
- * status line at the bottom.
+ * controls on the right. Errors from load and edit flows surface as Alert
+ * dialogs (Phase 10.1).
  */
 public final class MainWindowView extends BorderPane {
 
@@ -34,18 +33,24 @@ public final class MainWindowView extends BorderPane {
         setLeft(new LeftPaneView(colorSpaceViewModel, recentFilesViewModel, workspaceViewModel::open));
         setCenter(new CenterPaneView(workspaceViewModel, visualizationViewModel, colorPickerViewModel, coalescer));
         setRight(new RightPaneView(workspaceViewModel, channelsViewModel, quantizationViewModel));
-        setBottom(buildErrorBar(workspaceViewModel, editViewModel));
+
+        wireErrorDialogs(workspaceViewModel, editViewModel);
     }
 
-    private static Label buildErrorBar(ImageWorkspaceViewModel workspace, EditSessionViewModel edit) {
-        Label status = new Label();
-        status.setPadding(new Insets(4, 12, 4, 12));
-        status.setStyle("-fx-text-fill: #b00020;");
-        workspace.lastErrorProperty().addListener((obs, oldErr, newErr) ->
-                status.setText(newErr == null ? "" : "Failed to load image: " + newErr.getMessage()));
-        edit.lastErrorProperty().addListener((obs, oldErr, newErr) -> {
-            if (newErr != null) status.setText("Edit operation failed: " + newErr.getMessage());
+    private static void wireErrorDialogs(ImageWorkspaceViewModel workspace, EditSessionViewModel edit) {
+        workspace.lastErrorProperty().addListener((obs, oldErr, newErr) -> {
+            if (newErr != null) showError("Failed to load image", newErr);
         });
-        return status;
+        edit.lastErrorProperty().addListener((obs, oldErr, newErr) -> {
+            if (newErr != null) showError("Edit operation failed", newErr);
+        });
+    }
+
+    private static void showError(String header, Throwable t) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("PixelLab — Error");
+        alert.setHeaderText(header);
+        alert.setContentText(t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
+        alert.showAndWait();
     }
 }

@@ -3,8 +3,10 @@ package com.alaishat.mohammad.pixellab.features.imageworkspace.view;
 import com.alaishat.mohammad.pixellab.features.editsession.viewmodel.EditSessionViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
 import javafx.geometry.Insets;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ToolBar;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
@@ -12,8 +14,11 @@ import java.io.File;
 import java.util.Locale;
 
 /**
- * Top bar: Open (Phase 2.6) plus Save / Save As / Reset (Phase 4.5–4.6).
- * Edit-action buttons disable themselves when no image is loaded.
+ * Top bar: Open (Phase 2.6), Save / Save As / Reset (Phase 4.5–4.6), and the
+ * Phase 10.2 keyboard shortcuts (Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+R) bound
+ * to the same buttons via Scene accelerators.
+ *
+ * <p>Edit-action buttons disable themselves when no image is loaded.
  */
 public final class ToolbarView extends ToolBar {
 
@@ -36,6 +41,19 @@ public final class ToolbarView extends ToolBar {
         resetButton.setOnAction(e -> editVm.reset());
 
         getItems().addAll(openButton, saveButton, saveAsButton, resetButton);
+
+        // Scene isn't available during construction — wait for it, then install accelerators.
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) installAccelerators(newScene, openButton, saveButton, saveAsButton, resetButton);
+        });
+    }
+
+    private static void installAccelerators(Scene scene, Button open, Button save, Button saveAs, Button reset) {
+        // "Shortcut" maps to ⌘ on macOS and Ctrl elsewhere.
+        scene.getAccelerators().put(KeyCombination.keyCombination("Shortcut+O"), open::fire);
+        scene.getAccelerators().put(KeyCombination.keyCombination("Shortcut+S"), save::fire);
+        scene.getAccelerators().put(KeyCombination.keyCombination("Shortcut+Shift+S"), saveAs::fire);
+        scene.getAccelerators().put(KeyCombination.keyCombination("Shortcut+R"), reset::fire);
     }
 
     private static void openImage(ImageWorkspaceViewModel viewModel) {
@@ -84,7 +102,6 @@ public final class ToolbarView extends ToolBar {
 
     private static File ensureExtension(File picked, String preferredExt) {
         String name = picked.getName().toLowerCase(Locale.ROOT);
-        // Accept any reasonable image extension already present (.jpg/.jpeg both fine for JPEG).
         if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".bmp")) {
             return picked;
         }
