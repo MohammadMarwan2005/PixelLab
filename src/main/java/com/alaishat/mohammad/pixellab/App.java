@@ -20,7 +20,9 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        MainWindowView root = new MainWindowView(component.imageWorkspaceViewModel());
+        MainWindowView root = new MainWindowView(
+                component.imageWorkspaceViewModel(),
+                component.recentFilesViewModel());
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         stage.setTitle(WINDOW_TITLE);

@@ -21,6 +21,7 @@ public final class ImageWorkspaceViewModel {
 
     private final ObjectProperty<PixelBuffer> currentBuffer = new SimpleObjectProperty<>();
     private final ObjectProperty<ImageMetadata> currentMetadata = new SimpleObjectProperty<>();
+    private final ObjectProperty<java.nio.file.Path> currentSource = new SimpleObjectProperty<>();
     private final ReadOnlyObjectWrapper<Throwable> lastError = new ReadOnlyObjectWrapper<>();
 
     public ImageWorkspaceViewModel(LoadImageUseCase loadImage) {
@@ -33,6 +34,10 @@ public final class ImageWorkspaceViewModel {
 
     public ObjectProperty<ImageMetadata> currentMetadataProperty() {
         return currentMetadata;
+    }
+
+    public ObjectProperty<java.nio.file.Path> currentSourceProperty() {
+        return currentSource;
     }
 
     public ReadOnlyObjectProperty<Throwable> lastErrorProperty() {
@@ -48,6 +53,9 @@ public final class ImageWorkspaceViewModel {
             ImageLoader.LoadedImage loaded = loadImage.execute(source);
             currentBuffer.set(loaded.pixels());
             currentMetadata.set(loaded.metadata());
+            // Set source last so listeners observing it (e.g. recents) see the
+            // metadata + buffer already in place when they fire.
+            currentSource.set(source);
             lastError.set(null);
         } catch (IOException | RuntimeException e) {
             lastError.set(e);
