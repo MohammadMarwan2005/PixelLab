@@ -1,8 +1,8 @@
 package com.alaishat.mohammad.pixellab;
 
+import com.alaishat.mohammad.pixellab.features.imageworkspace.view.MainWindowView;
 import javafx.application.Application;
 import javafx.scene.Scene;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
 public class App extends Application {
@@ -20,7 +20,7 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        StackPane root = new StackPane();
+        MainWindowView root = new MainWindowView(component.imageWorkspaceViewModel());
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         stage.setTitle(WINDOW_TITLE);
