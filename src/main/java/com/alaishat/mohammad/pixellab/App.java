@@ -28,7 +28,8 @@ public class App extends Application {
                 component.quantizationViewModel(),
                 component.visualizationViewModel(),
                 component.colorPickerViewModel(),
-                component.recentFilesViewModel());
+                component.recentFilesViewModel(),
+                component.updateCoalescer());
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         stage.setTitle(WINDOW_TITLE);
@@ -36,6 +37,11 @@ public class App extends Application {
         stage.setMinWidth(960);
         stage.setMinHeight(600);
         stage.show();
+    }
+
+    @Override
+    public void stop() {
+        if (component != null) component.shutdown();
     }
 
     public static void main(String[] args) {

@@ -27,12 +27,17 @@ import com.alaishat.mohammad.pixellab.features.visualization3d.viewmodel.ColorSp
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageLoader;
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageSaver;
 import com.alaishat.mohammad.pixellab.infrastructure.persistence.JsonRecentFilesStore;
+import com.alaishat.mohammad.pixellab.shared.threading.BackgroundExecutor;
+import com.alaishat.mohammad.pixellab.shared.threading.UpdateCoalescer;
 
 /**
  * Composition root. Wires together infrastructure, use cases, and view models.
  * Manual DI — reading this class should reveal the entire dependency graph.
  */
 public final class AppComponent {
+
+    private final BackgroundExecutor backgroundExecutor;
+    private final UpdateCoalescer updateCoalescer;
 
     private final ImageWorkspaceViewModel imageWorkspaceViewModel;
     private final EditSessionViewModel editSessionViewModel;
@@ -44,27 +49,32 @@ public final class AppComponent {
     private final RecentFilesViewModel recentFilesViewModel;
 
     public AppComponent() {
+        this.backgroundExecutor = new BackgroundExecutor();
+        this.updateCoalescer = new UpdateCoalescer(backgroundExecutor);
+
         ImageLoader imageLoader = new FileSystemImageLoader();
         ImageSaver imageSaver = new FileSystemImageSaver();
 
         this.imageWorkspaceViewModel = new ImageWorkspaceViewModel(new LoadImageUseCase(imageLoader));
         this.colorSpaceViewModel = new ColorSpaceViewModel(
                 imageWorkspaceViewModel,
-                new ConvertColorSpaceUseCase());
+                new ConvertColorSpaceUseCase(),
+                updateCoalescer);
 
         // Pipeline: ChannelsViewModel emits channelAdjustedBuffer; QuantizationViewModel
-        // consumes it and writes the final working buffer.
+        // consumes it and writes the final working buffer. Both run on the bg executor.
         this.channelsViewModel = new ChannelsViewModel(
                 imageWorkspaceViewModel,
                 colorSpaceViewModel,
                 new ApplyChannelAdjustmentsUseCase(),
-                new SplitChannelsUseCase());
+                new SplitChannelsUseCase(),
+                updateCoalescer);
         this.quantizationViewModel = new QuantizationViewModel(
                 imageWorkspaceViewModel,
                 channelsViewModel,
-                new QuantizeColorsUseCase());
+                new QuantizeColorsUseCase(),
+                updateCoalescer);
 
-        // 3D viz + sync color picker: rebuild samples on space change; picker reads picked sample.
         this.visualizationViewModel = new ColorSpaceVisualizationViewModel(
                 colorSpaceViewModel,
                 new SampleColorSpaceUseCase());
@@ -96,6 +106,10 @@ public final class AppComponent {
         recentFilesViewModel.refresh();
     }
 
+    public void shutdown() {
+        backgroundExecutor.shutdown();
+    }
+
     public ImageWorkspaceViewModel imageWorkspaceViewModel()           { return imageWorkspaceViewModel; }
     public EditSessionViewModel editSessionViewModel()                 { return editSessionViewModel; }
     public ColorSpaceViewModel colorSpaceViewModel()                   { return colorSpaceViewModel; }
@@ -104,4 +118,5 @@ public final class AppComponent {
     public ColorSpaceVisualizationViewModel visualizationViewModel()   { return visualizationViewModel; }
     public ColorPickerViewModel colorPickerViewModel()                 { return colorPickerViewModel; }
     public RecentFilesViewModel recentFilesViewModel()                 { return recentFilesViewModel; }
+    public UpdateCoalescer updateCoalescer()                           { return updateCoalescer; }
 }

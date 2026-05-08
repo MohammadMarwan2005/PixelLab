@@ -8,6 +8,7 @@ import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWor
 import com.alaishat.mohammad.pixellab.features.quantization.viewmodel.QuantizationViewModel;
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
 import com.alaishat.mohammad.pixellab.features.visualization3d.viewmodel.ColorSpaceVisualizationViewModel;
+import com.alaishat.mohammad.pixellab.shared.threading.UpdateCoalescer;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
@@ -27,10 +28,11 @@ public final class MainWindowView extends BorderPane {
                           QuantizationViewModel quantizationViewModel,
                           ColorSpaceVisualizationViewModel visualizationViewModel,
                           ColorPickerViewModel colorPickerViewModel,
-                          RecentFilesViewModel recentFilesViewModel) {
+                          RecentFilesViewModel recentFilesViewModel,
+                          UpdateCoalescer coalescer) {
         setTop(new ToolbarView(workspaceViewModel, editViewModel));
         setLeft(new LeftPaneView(colorSpaceViewModel, recentFilesViewModel, workspaceViewModel::open));
-        setCenter(new CenterPaneView(workspaceViewModel, visualizationViewModel, colorPickerViewModel));
+        setCenter(new CenterPaneView(workspaceViewModel, visualizationViewModel, colorPickerViewModel, coalescer));
         setRight(new RightPaneView(workspaceViewModel, channelsViewModel, quantizationViewModel));
         setBottom(buildErrorBar(workspaceViewModel, editViewModel));
     }

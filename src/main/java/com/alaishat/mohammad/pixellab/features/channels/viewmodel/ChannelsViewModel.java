@@ -9,6 +9,7 @@ import com.alaishat.mohammad.pixellab.features.channels.usecase.ChannelCodec;
 import com.alaishat.mohammad.pixellab.features.channels.usecase.SplitChannelsUseCase;
 import com.alaishat.mohammad.pixellab.features.colorspace.viewmodel.ColorSpaceViewModel;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
+import com.alaishat.mohammad.pixellab.shared.threading.UpdateCoalescer;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
@@ -30,38 +31,42 @@ import java.util.Objects;
  * pipeline. It produces a {@code channelAdjustedBuffer} from the session's
  * original RGB buffer and exposes it as a property; downstream stages
  * (currently quantization) read from there and ultimately write the working
- * buffer. We never touch the working buffer directly, so quantization can
- * re-run without having to redo channel adjustments.
+ * buffer.
+ *
+ * <p>Heavy work runs through the shared {@link UpdateCoalescer} (Phase 9):
+ * slider drags submit tasks under the {@code "channels"} key, with newer
+ * submissions replacing pending ones — older intermediate values are dropped.
  *
  * <p>Reconstruction is always derived from {@link EditSession#originalBuffer()},
  * so dragging a slider doesn't compound earlier offsets.
- *
- * <p>Channel rebuild: the channel list is rebuilt whenever the color space or
- * session changes — "channel 0" means different things in RGB vs HSV.
  */
 public final class ChannelsViewModel {
+
+    private static final Object COALESCER_KEY = "channels:recompute";
 
     private final ImageWorkspaceViewModel workspace;
     private final ColorSpaceViewModel colorSpace;
     private final ApplyChannelAdjustmentsUseCase applyAdjustments;
     private final SplitChannelsUseCase splitChannels;
+    private final UpdateCoalescer coalescer;
 
     private final ObservableList<ChannelControl> channels = FXCollections.observableArrayList();
     private final ObservableList<ChannelControl> channelsView = FXCollections.unmodifiableObservableList(channels);
 
     private final ReadOnlyObjectWrapper<PixelBuffer> channelAdjustedBuffer = new ReadOnlyObjectWrapper<>();
 
-    /** True while we mutate channel state programmatically; suppresses recompute spam. */
     private boolean applying = false;
 
     public ChannelsViewModel(ImageWorkspaceViewModel workspace,
                              ColorSpaceViewModel colorSpace,
                              ApplyChannelAdjustmentsUseCase applyAdjustments,
-                             SplitChannelsUseCase splitChannels) {
+                             SplitChannelsUseCase splitChannels,
+                             UpdateCoalescer coalescer) {
         this.workspace = Objects.requireNonNull(workspace, "workspace");
         this.colorSpace = Objects.requireNonNull(colorSpace, "colorSpace");
         this.applyAdjustments = Objects.requireNonNull(applyAdjustments, "applyAdjustments");
         this.splitChannels = Objects.requireNonNull(splitChannels, "splitChannels");
+        this.coalescer = Objects.requireNonNull(coalescer, "coalescer");
 
         colorSpace.currentSpaceProperty().addListener((obs, old, neu) -> rebuildChannels());
         workspace.editSessionProperty().addListener((obs, old, neu) -> rebuildChannels());
@@ -72,7 +77,6 @@ public final class ChannelsViewModel {
         return channelsView;
     }
 
-    /** Latest output of the channel-adjustment pass — input to downstream stages. */
     public ReadOnlyObjectProperty<PixelBuffer> channelAdjustedBufferProperty() {
         return channelAdjustedBuffer.getReadOnlyProperty();
     }
@@ -129,17 +133,33 @@ public final class ChannelsViewModel {
                 adjustments[i] = ChannelAdjustment.offset(rawOffset);
             }
         }
+        // Snapshot inputs so the bg task is independent of further UI changes.
+        PixelBuffer original = session.originalBuffer();
+        int channelCount = channels.size();
 
-        PixelBuffer reconstructed = applyAdjustments.execute(session.originalBuffer(), space, adjustments);
-        channelAdjustedBuffer.set(reconstructed);
-
-        List<PixelBuffer> grays = splitChannels.execute(reconstructed, space);
-        for (int i = 0; i < channels.size(); i++) {
-            channels.get(i).thumbnail.set(grays.get(i));
-        }
+        coalescer.submit(COALESCER_KEY,
+                () -> {
+                    PixelBuffer reconstructed = applyAdjustments.execute(original, space, adjustments);
+                    List<PixelBuffer> grays = splitChannels.execute(reconstructed, space);
+                    return new Result(reconstructed, grays);
+                },
+                result -> {
+                    // Drop stale results — if the user changed space / opened a new image
+                    // while we were computing, the channels list may have a different shape.
+                    if (workspace.editSessionProperty().get() != session
+                            || colorSpace.currentSpaceProperty().get() != space
+                            || channels.size() != channelCount) {
+                        return;
+                    }
+                    channelAdjustedBuffer.set(result.buffer);
+                    for (int i = 0; i < channels.size(); i++) {
+                        channels.get(i).thumbnail.set(result.thumbs.get(i));
+                    }
+                });
     }
 
-    /** Per-channel UI state: index, label, offset (-1..+1 of natural range), enabled flag, thumbnail buffer. */
+    private record Result(PixelBuffer buffer, List<PixelBuffer> thumbs) {}
+
     public static final class ChannelControl {
         private final int index;
         private final String label;

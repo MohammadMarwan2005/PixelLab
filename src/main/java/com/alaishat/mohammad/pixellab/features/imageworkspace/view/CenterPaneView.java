@@ -5,6 +5,7 @@ import com.alaishat.mohammad.pixellab.features.colorpicker.viewmodel.ColorPicker
 import com.alaishat.mohammad.pixellab.features.imageworkspace.viewmodel.ImageWorkspaceViewModel;
 import com.alaishat.mohammad.pixellab.features.visualization3d.view.ColorSpaceVisualizationView;
 import com.alaishat.mohammad.pixellab.features.visualization3d.viewmodel.ColorSpaceVisualizationViewModel;
+import com.alaishat.mohammad.pixellab.shared.threading.UpdateCoalescer;
 import javafx.geometry.Side;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -18,11 +19,12 @@ public final class CenterPaneView extends TabPane {
 
     public CenterPaneView(ImageWorkspaceViewModel workspaceViewModel,
                           ColorSpaceVisualizationViewModel visualizationViewModel,
-                          ColorPickerViewModel colorPickerViewModel) {
+                          ColorPickerViewModel colorPickerViewModel,
+                          UpdateCoalescer coalescer) {
         setSide(Side.TOP);
         setTabClosingPolicy(TabClosingPolicy.UNAVAILABLE);
 
-        Tab imageTab = new Tab("Image", new ImageCanvasView(workspaceViewModel));
+        Tab imageTab = new Tab("Image", new ImageCanvasView(workspaceViewModel, coalescer));
 
         BorderPane vizContainer = new BorderPane();
         vizContainer.setCenter(new ColorSpaceVisualizationView(visualizationViewModel));
