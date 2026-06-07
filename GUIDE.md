@@ -30,6 +30,10 @@ section 1 and read linearly — each section builds on the previous one.
 13. [The UI layout](#13-the-ui-layout)
 14. [Entry points](#14-entry-points)
 15. [Tests](#15-tests)
+16. [Audio Lab: compressing audio](#16-audio-lab-compressing-audio)
+    - [AudioWorkspace — loading and playing audio](#161-audioworkspace--loading-and-playing-audio)
+    - [Compression algorithms — DM, ADM, DPCM](#162-compression-algorithms--dm-adm-dpcm)
+    - [AudioCompression — running, monitoring, and saving a compression](#163-audiocompression--running-monitoring-and-saving-a-compression)
 
 ---
 
@@ -688,6 +692,122 @@ colors (red, green, blue, white, black, gray, and arbitrary mid-tones).
 
 ---
 
+## 16. Audio Lab: compressing audio
+
+The "Audio Lab" tab is a second, self-contained workspace — same architecture
+shape as the Image Lab (`domain` → `features` → `infrastructure`, manual DI,
+ports + thin adapters), wired in alongside it via `RootView`'s `TabPane`.
+
+### 16.1 AudioWorkspace — loading and playing audio
+
+**View model:** [features/audioworkspace/viewmodel/AudioWorkspaceViewModel.java](src/main/java/com/alaishat/mohammad/pixellab/features/audioworkspace/viewmodel/AudioWorkspaceViewModel.java)
+
+Mirrors `ImageWorkspaceViewModel` + `EditSessionViewModel` combined: it owns
+`editSession` (an `AudioEditSession`, mirroring `EditSession` — immutable
+`originalBuffer`, replaceable `workingBuffer`), `currentMetadata`
+(`AudioMetadata`: size, duration, sample rate, channels, bit depth, bit rate,
+encoding — all auto-displayed by `AudioPropertiesView`), and playback state
+(`playing`, `position`, `duration`) driven by the `AudioPlayer` port
+(`JavaSoundAudioPlayer`, built on `javax.sound.sampled.Clip`).
+
+`AudioBuffer` stores PCM samples as `int[][]` — one `int[]` per channel — at
+whatever bit depth the source file used; this is what the compression codecs
+operate on directly (no float conversion, no resampling).
+
+`republishWorkingBuffer()` plays the same role as `workingBufferRevision` on
+the image side: an explicit "the working buffer changed in place" signal for
+observers (waveform, compression) that doesn't depend on object-identity change.
+
+### 16.2 Compression algorithms — DM, ADM, DPCM
+
+**Interface:** [domain/audio/compression/AudioCodec.java](src/main/java/com/alaishat/mohammad/pixellab/domain/audio/compression/AudioCodec.java)
+**Implementations:** `DeltaModulationCodec`, `AdaptiveDeltaModulationCodec`, `DpcmCodec`
+
+All three are classic *waveform/differential* codecs sharing one shape —
+predict the next sample from history, encode the residual in fewer bits,
+reconstruct by replaying the same prediction — escalating in sophistication:
+
+| Algorithm | Encodes each sample as | Step behavior |
+|---|---|---|
+| **Delta Modulation (DM)** | 1 bit (residual sign) | Fixed step size |
+| **Adaptive Delta Modulation (ADM)** | 1 bit (residual sign) | Step grows/shrinks by `adaptationFactor` based on recent bits (handles loud *and* quiet passages without the user retuning the step) |
+| **DPCM** | `quantizationBits` bits (quantized residual) | Uniform quantizer over the residual range |
+
+These three were chosen over **Nonlinear Quantization** (memoryless — would've
+needed a structurally different abstraction for one algorithm) and
+**Predictive Differential Coding** (functionally redundant with DPCM — "DPCM
+with a fancier predictor"). Picking algorithms that share one shape kept
+`AudioCodec` a single small interface and let `BitWriter`/`BitReader` (MSB-first
+sub-byte packing) and `PcmRange` (clamping that keeps encoder/decoder predictors
+in sync) be reused across all three — exactly the "stateless, same-shape"
+pattern the `domain/color/conversion` classes already use.
+
+**Why these are *fixed-rate* codes (important for reading the live charts):**
+none of the three do entropy coding — DM/ADM always emit exactly 1 bit/sample,
+DPCM always emits exactly `quantizationBits` bits/sample, regardless of
+content. So the compression ratio `bitDepth / bitsPerSample` is a *constant*
+for a given algorithm + settings — the live ratio chart necessarily converges
+to that constant almost immediately. That's not a bug or a boring chart; it's
+the actual, honest behavior of fixed-rate codes, and a good discussion point
+("why doesn't a smarter signal compress better here, the way MP3 would?").
+
+Tests in [src/test/java/.../domain/audio/compression/](src/test/java/com/alaishat/mohammad/pixellab/domain/audio/compression/)
+mirror `domain/color/conversion`'s style: hand-traced known-value tests (DM/ADM,
+which lack a closed-form error bound) plus round-trip/determinism tests, and —
+for DPCM specifically — a property-based test asserting `|sample − decoded| ≤
+step/2` for every sample, backed by a structural proof (the decoder replays the
+encoder's exact predictor sequence, so the error can never accumulate).
+
+### 16.3 AudioCompression — running, monitoring, and saving a compression
+
+**View model:** [features/audiocompression/viewmodel/AudioCompressionViewModel.java](src/main/java/com/alaishat/mohammad/pixellab/features/audiocompression/viewmodel/AudioCompressionViewModel.java)
+
+This view model exposes the user-tunable `CompressionSettings` (algorithm,
+quantization bits, step size, adaptation factor — `CompressionSettingsView`
+binds sliders to them and grays out whichever ones the selected algorithm
+ignores), drives a compression run, and republishes the result.
+
+**Why `javafx.concurrent.Task` instead of `BackgroundExecutor`/`UpdateCoalescer`:**
+those two implement *"latest-wins, replace the pending job"* — exactly right for
+live recompute (drag a slider, only the newest value matters), exactly wrong for
+a one-shot job that must run to completion, report fine-grained progress, and be
+explicitly cancellable. `Task` ships `updateProgress`/`cancel`/`isCancelled` for
+free, so `compress()` builds one, binds `progressProperty` to it, and submits it
+to a dedicated single-thread `ExecutorService` (created and shut down in
+`AppComponent`, separate from `backgroundExecutor`).
+
+Inside the task, `CompressAudioUseCase` loops once per channel — `MultiChannelProgress.scoped(...)`
+rescales each channel's local `(processed, total)` into one continuous signal
+spanning every channel, which both drives the progress bar and feeds the two
+live `LineChart`s (`ratioSeriesData`/`speedSeriesData`, appended via
+`Platform.runLater` since codec callbacks run on the background thread).
+
+**The flow end to end:**
+1. `compress()` snapshots the working buffer, runs the chosen `AudioCodec` per
+   channel, and produces an `EncodedAudio` + `CompressionReport` (sizes, savings
+   %, ratio, elapsed time, algorithm + settings used — rendered by
+   `CompressionReportView`).
+2. `decompress()` runs `DecompressAudioUseCase` synchronously, installs the
+   result as the new working buffer via `session.replaceWorking(...)` +
+   `republishWorkingBuffer()` — so it's immediately playable, comparable to the
+   original, and saveable as WAV through the existing `SaveAudioUseCase`.
+3. `saveCompressed(target)` writes the `EncodedAudio` to disk as a `.pxac`
+   container via `SaveCompressedAudioUseCase` → `CompressedAudioStore` →
+   `FileSystemCompressedAudioStore` (a small custom binary format — unavoidable,
+   since none of these codecs produce a standard-container-compatible bitstream;
+   every real codec does the same, just with a far more elaborate header).
+4. `cancel()` requests cooperative cancellation; the codec checks
+   `listener.isCancelled()` between samples.
+
+**Clearing stale results:** a freshly opened file swaps the `editSession`
+reference (caught by a listener there), but **Reset** replaces the working
+buffer *in place* — same session, `workingBufferRevision` bumped instead. The
+view model listens to that revision too, using a one-shot
+`ignoreNextWorkingBufferRevision` flag to tell "Reset happened — clear results"
+apart from "my own `decompress()` just bumped it — keep them".
+
+---
+
 ## Summary: reading order for the code
 
 If you want to read the source files in logical order rather than alphabetically:
@@ -708,3 +828,14 @@ If you want to read the source files in logical order rather than alphabetically
 14. `features/quantization/viewmodel/QuantizationViewModel.java` — third and final stage
 15. `features/imageworkspace/view/MainWindowView.java` — how it all appears on screen
 16. `App.java` + `AppComponent.java` — startup and wiring
+
+If you're here for the **Audio Lab** specifically:
+
+17. `domain/audio/AudioBuffer.java` — PCM sample container (mirrors `PixelBuffer`)
+18. `domain/audio/AudioEditSession.java` — edit lifecycle (mirrors `EditSession`)
+19. `domain/audio/compression/AudioCodec.java` — the shared codec shape
+20. `domain/audio/compression/DeltaModulationCodec.java` — simplest codec to read first
+21. `domain/audio/compression/CompressionSettings.java`, `EncodedAudio.java`, `CompressionReport.java` — the data the feature passes around
+22. `features/audioworkspace/viewmodel/AudioWorkspaceViewModel.java` — central hub (mirrors `ImageWorkspaceViewModel` + `EditSessionViewModel`)
+23. `features/audiocompression/viewmodel/AudioCompressionViewModel.java` — drives the compression `Task`, charts, and report
+24. `features/audioworkspace/view/AudioLabView.java` — how it all appears on screen

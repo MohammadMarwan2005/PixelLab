@@ -1,8 +1,26 @@
 package com.alaishat.mohammad.pixellab;
 
+import com.alaishat.mohammad.pixellab.domain.audio.AudioLoader;
+import com.alaishat.mohammad.pixellab.domain.audio.AudioPlayer;
+import com.alaishat.mohammad.pixellab.domain.audio.AudioSaver;
+import com.alaishat.mohammad.pixellab.domain.audio.compression.AdaptiveDeltaModulationCodec;
+import com.alaishat.mohammad.pixellab.domain.audio.compression.AudioCodec;
+import com.alaishat.mohammad.pixellab.domain.audio.compression.CompressedAudioStore;
+import com.alaishat.mohammad.pixellab.domain.audio.compression.CompressionAlgorithm;
+import com.alaishat.mohammad.pixellab.domain.audio.compression.DeltaModulationCodec;
+import com.alaishat.mohammad.pixellab.domain.audio.compression.DpcmCodec;
 import com.alaishat.mohammad.pixellab.domain.image.ImageLoader;
 import com.alaishat.mohammad.pixellab.domain.image.ImageSaver;
 import com.alaishat.mohammad.pixellab.domain.recentfiles.RecentFilesStore;
+import com.alaishat.mohammad.pixellab.features.audiocompression.usecase.CompressAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audiocompression.usecase.DecompressAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audiocompression.usecase.SaveCompressedAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audiocompression.viewmodel.AudioCompressionViewModel;
+import com.alaishat.mohammad.pixellab.features.audioworkspace.usecase.LoadAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audioworkspace.usecase.ResetAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audioworkspace.usecase.SaveAsAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audioworkspace.usecase.SaveAudioUseCase;
+import com.alaishat.mohammad.pixellab.features.audioworkspace.viewmodel.AudioWorkspaceViewModel;
 import com.alaishat.mohammad.pixellab.features.channels.usecase.ApplyChannelAdjustmentsUseCase;
 import com.alaishat.mohammad.pixellab.features.channels.usecase.SplitChannelsUseCase;
 import com.alaishat.mohammad.pixellab.features.channels.viewmodel.ChannelsViewModel;
@@ -24,11 +42,19 @@ import com.alaishat.mohammad.pixellab.features.recentfiles.usecase.RemoveRecentF
 import com.alaishat.mohammad.pixellab.features.recentfiles.viewmodel.RecentFilesViewModel;
 import com.alaishat.mohammad.pixellab.features.visualization3d.usecase.SampleColorSpaceUseCase;
 import com.alaishat.mohammad.pixellab.features.visualization3d.viewmodel.ColorSpaceVisualizationViewModel;
+import com.alaishat.mohammad.pixellab.infrastructure.audio.JavaSoundAudioPlayer;
+import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemAudioLoader;
+import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemAudioSaver;
+import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemCompressedAudioStore;
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageLoader;
 import com.alaishat.mohammad.pixellab.infrastructure.io.FileSystemImageSaver;
 import com.alaishat.mohammad.pixellab.infrastructure.persistence.JsonRecentFilesStore;
 import com.alaishat.mohammad.pixellab.shared.threading.BackgroundExecutor;
 import com.alaishat.mohammad.pixellab.shared.threading.UpdateCoalescer;
+
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Composition root. Wires together infrastructure, use cases, and view models.
@@ -47,6 +73,9 @@ public final class AppComponent {
     private final ColorSpaceVisualizationViewModel visualizationViewModel;
     private final ColorPickerViewModel colorPickerViewModel;
     private final RecentFilesViewModel recentFilesViewModel;
+    private final AudioWorkspaceViewModel audioWorkspaceViewModel;
+    private final AudioCompressionViewModel audioCompressionViewModel;
+    private final ExecutorService compressionExecutor;
 
     public AppComponent() {
         this.backgroundExecutor = new BackgroundExecutor();
@@ -104,10 +133,45 @@ public final class AppComponent {
         });
 
         recentFilesViewModel.refresh();
+
+        AudioLoader audioLoader = new FileSystemAudioLoader();
+        AudioSaver audioSaver = new FileSystemAudioSaver();
+        AudioPlayer audioPlayer = new JavaSoundAudioPlayer();
+        this.audioWorkspaceViewModel = new AudioWorkspaceViewModel(
+                new LoadAudioUseCase(audioLoader),
+                new ResetAudioUseCase(),
+                new SaveAudioUseCase(audioSaver),
+                new SaveAsAudioUseCase(audioSaver),
+                audioPlayer);
+
+        // One codec per algorithm (Req. 4) — CompressAudioUseCase/DecompressAudioUseCase
+        // pick the right one by CompressionAlgorithm key, same shape as the
+        // image side's "one converter per color space" maps.
+        Map<CompressionAlgorithm, AudioCodec> codecs = Map.of(
+                CompressionAlgorithm.DELTA_MODULATION, new DeltaModulationCodec(),
+                CompressionAlgorithm.ADAPTIVE_DELTA_MODULATION, new AdaptiveDeltaModulationCodec(),
+                CompressionAlgorithm.DPCM, new DpcmCodec());
+        CompressedAudioStore compressedAudioStore = new FileSystemCompressedAudioStore();
+
+        // Compression jobs are one-shot, cancellable, and must run to completion in
+        // order — a dedicated single-thread executor (separate from backgroundExecutor,
+        // which is for "latest-wins" live recompute) is the right shape for that.
+        this.compressionExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "audio-compression");
+            thread.setDaemon(true);
+            return thread;
+        });
+        this.audioCompressionViewModel = new AudioCompressionViewModel(
+                audioWorkspaceViewModel,
+                new CompressAudioUseCase(codecs),
+                new DecompressAudioUseCase(codecs),
+                new SaveCompressedAudioUseCase(compressedAudioStore),
+                compressionExecutor);
     }
 
     public void shutdown() {
         backgroundExecutor.shutdown();
+        compressionExecutor.shutdown();
     }
 
     public ImageWorkspaceViewModel imageWorkspaceViewModel()           { return imageWorkspaceViewModel; }
@@ -119,4 +183,6 @@ public final class AppComponent {
     public ColorPickerViewModel colorPickerViewModel()                 { return colorPickerViewModel; }
     public RecentFilesViewModel recentFilesViewModel()                 { return recentFilesViewModel; }
     public UpdateCoalescer updateCoalescer()                           { return updateCoalescer; }
+    public AudioWorkspaceViewModel audioWorkspaceViewModel()           { return audioWorkspaceViewModel; }
+    public AudioCompressionViewModel audioCompressionViewModel()       { return audioCompressionViewModel; }
 }

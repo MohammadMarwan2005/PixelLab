@@ -1,7 +1,7 @@
 # PixelLab
 
-Interactive desktop app for exploring images, color spaces, and image
-processing in real time.
+Interactive desktop app for exploring images, color spaces, image processing,
+and audio compression in real time.
 
 > Course: Multimedia 2026 · Faculty of Informatics Engineering
 
@@ -19,6 +19,20 @@ processing in real time.
 - Background processing pipeline keeps the UI responsive on large images;
   spinner appears for ops > 200 ms.
 - Keyboard shortcuts: **Ctrl+O** (Open), **Ctrl+S** (Save), **Ctrl+Shift+S** (Save As), **Ctrl+R** (Reset).
+
+**Audio Lab** (second top-level tab):
+- Open WAV/AIFF/AU via toolbar or drag-and-drop; play/pause/stop preview with a
+  waveform view and live position.
+- Auto-displayed properties: file size, duration, sample rate, channels, bit
+  rate, encoding.
+- **Compress** with **Delta Modulation**, **Adaptive Delta Modulation**, or
+  **DPCM** — adjustable quantization bits / step size / adaptation factor —
+  run as a cancellable background job with a live progress bar and two charts
+  (compression ratio, processing speed over time).
+- **Decompress** back into the working buffer (playable, comparable, saveable
+  as WAV), a post-run **report** (sizes, savings %, ratio, time, settings used),
+  and **Save compressed…** to PixelLab's custom `.pxac` container.
+- Reset restores the original audio and clears any compression results.
 
 ## Tech Stack
 
@@ -74,6 +88,8 @@ src/main/java/com/alaishat/mohammad/pixellab/
 ├── domain/                Pure logic — no JavaFX
 │   ├── image/             PixelBuffer, ImageMetadata, EditSession, ports
 │   ├── color/             ColorSpace, ColorTriplet, Cmyk, conversions/
+│   ├── audio/             AudioBuffer, AudioMetadata, AudioEditSession, ports
+│   │   └── compression/   AudioCodec + DM/ADM/DPCM, settings, report, PXAC port
 │   └── recentfiles/       RecentFile + store port
 ├── features/              One package per feature (usecase / viewmodel / view)
 │   ├── imageworkspace/
@@ -83,8 +99,10 @@ src/main/java/com/alaishat/mohammad/pixellab/
 │   ├── channels/
 │   ├── quantization/
 │   ├── visualization3d/
-│   └── colorpicker/
-├── infrastructure/        File I/O + JSON store impls
+│   ├── colorpicker/
+│   ├── audioworkspace/    Open/play/save/reset, waveform, properties
+│   └── audiocompression/  Compress/decompress/save, settings + progress + report views
+├── infrastructure/        File I/O + JSON store + PXAC container + audio playback impls
 └── shared/threading/      BackgroundExecutor + UpdateCoalescer
 ```
 

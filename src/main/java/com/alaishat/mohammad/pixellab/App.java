@@ -1,5 +1,6 @@
 package com.alaishat.mohammad.pixellab;
 
+import com.alaishat.mohammad.pixellab.features.audioworkspace.view.AudioLabView;
 import com.alaishat.mohammad.pixellab.features.imageworkspace.view.MainWindowView;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -20,7 +21,7 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        MainWindowView root = new MainWindowView(
+        MainWindowView imageLab = new MainWindowView(
                 component.imageWorkspaceViewModel(),
                 component.editSessionViewModel(),
                 component.colorSpaceViewModel(),
@@ -30,6 +31,8 @@ public class App extends Application {
                 component.colorPickerViewModel(),
                 component.recentFilesViewModel(),
                 component.updateCoalescer());
+        AudioLabView audioLab = new AudioLabView(component.audioWorkspaceViewModel(), component.audioCompressionViewModel());
+        RootView root = new RootView(imageLab, audioLab);
         Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
 
         stage.setTitle(WINDOW_TITLE);
